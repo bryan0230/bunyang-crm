@@ -267,18 +267,23 @@ async function del(id){
   customers=customers.filter(x=>x.id!==id);render();
 }
 
-// ===== 복사/붙여넣기 =====
-function copyRow(id){
+// ===== 시스템 클립보드로 복사 =====
+async function copyRow(id){
   const c=customers.find(x=>x.id===id);
-  clipboard={name:c.name,phone:c.phone};
-  toast(`📋 복사됨: ${c.name||'(이름없음)'} / ${c.phone||''}`);
-}
-async function pasteRow(id){
-  if(!clipboard)return toast('먼저 복사해주세요');
-  const c=customers.find(x=>x.id===id);
-  c.name=clipboard.name;c.phone=clipboard.phone;
-  await sb.from('customers').update({name:clipboard.name,phone:clipboard.phone}).eq('id',id);
-  render();toast('✅ 붙여넣기 완료');
+  const text=`${c.name||''} ${c.phone||''}`.trim();
+  if(!text)return toast('❌ 복사할 내용 없음');
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('📋 복사됨: '+text);
+  }catch(err){
+    // HTTPS 아니거나 권한 없을 때 폴백
+    const ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('📋 복사됨: '+text)}
+    catch(e){toast('❌ 복사 실패')}
+    document.body.removeChild(ta);
+  }
 }
 
 // ===== 렌더링 =====
@@ -301,8 +306,7 @@ function render(){
       <td><input value="${escAttr(c.result)}" onchange="upd(${c.id},'result',this.value)"></td>
       <td><input value="${escAttr(c.sensitivity)}" onchange="upd(${c.id},'sensitivity',this.value)"></td>
       <td><div class="act">
-        <button class="copy" onclick="copyRow(${c.id})">복사</button>
-        <button class="s" onclick="pasteRow(${c.id})">붙여</button>
+        <button class="copy" onclick="copyRow(${c.id})">📋 복사</button>
         <button class="d" onclick="del(${c.id})">삭제</button>
       </div></td>
     </tr>`).join('');
@@ -325,7 +329,6 @@ function render(){
       </div>
       <div class="btns">
         <button class="copy" onclick="copyRow(${c.id})">📋 복사</button>
-        <button class="s" onclick="pasteRow(${c.id})">📥 붙여넣기</button>
         <button class="d" onclick="del(${c.id})">삭제</button>
       </div>
     </div>`).join('');
