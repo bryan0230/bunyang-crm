@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>분양 고객관리</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,'Malgun Gothic',sans-serif;background:#F6F3E7;color:#222;padding:15px;padding-bottom:80px}
+.wrap{max-width:1300px;margin:0 auto}
+h1{color:#8F3745;font-size:22px;margin-bottom:15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.back{background:#00424E;color:#fff;border:none;padding:6px 12px;border-radius:5px;font-size:13px;cursor:pointer}
+.setup{background:#fff;padding:20px;border-radius:10px;margin-bottom:15px;border:2px dashed #8F3745}
+.setup input{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:5px;font-size:14px}
+.bar{background:#fff;padding:12px;border-radius:8px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+button{background:#8F3745;color:#fff;border:none;padding:9px 14px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:bold}
+button.s{background:#00424E}
+button.g{background:#666}
+button.d{background:#c0392b;padding:6px 10px;font-size:12px}
+button:active{opacity:0.7}
+input[type=text],select,textarea{padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;font-family:inherit}
+#q{flex:1;min-width:150px}
+.sites{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:15px}
+.site{background:#fff;padding:20px;border-radius:10px;cursor:pointer;border-left:5px solid #8F3745;box-shadow:0 2px 8px rgba(0,0,0,0.08);position:relative}
+.site:hover{transform:translateY(-2px);transition:0.2s}
+.site h3{color:#8F3745;margin-bottom:6px;padding-right:30px}
+.site .cnt{color:#666;font-size:13px}
+.site .x{position:absolute;top:8px;right:8px;background:none;color:#c0392b;padding:4px 8px;font-size:16px}
+
+/* 데스크톱 테이블 */
+.tbl{width:100%;background:#fff;border-collapse:collapse;border-radius:8px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+.tbl th{background:#8F3745;color:#fff;padding:10px 6px;text-align:left;font-size:13px;white-space:nowrap}
+.tbl td{padding:6px;border-bottom:1px solid #eee;vertical-align:top}
+.tbl td input,.tbl td select,.tbl td textarea{width:100%;border:1px solid #e0e0e0;padding:6px;font-size:13px;border-radius:3px}
+.tbl td textarea{min-height:38px;resize:vertical}
+.act{display:flex;gap:4px;flex-wrap:wrap}
+.act button{padding:5px 8px;font-size:11px}
+.copy{background:#00424E}
+
+/* 모바일 카드 */
+.cards{display:none}
+.card{background:#fff;padding:14px;border-radius:10px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+.card .row{display:flex;gap:8px;margin-bottom:8px}
+.card label{font-size:11px;color:#888;display:block;margin-bottom:2px}
+.card .f{flex:1}
+.card input,.card select,.card textarea{width:100%;border:1px solid #e0e0e0;padding:8px;font-size:14px;border-radius:4px}
+.card .btns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.card .btns button{flex:1;min-width:70px}
+
+.empty{text-align:center;padding:40px;color:#999;background:#fff;border-radius:8px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#00424E;color:#fff;padding:12px 20px;border-radius:25px;font-size:14px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.2);display:none}
+
+@media(max-width:768px){
+  body{padding:10px;padding-bottom:80px}
+  h1{font-size:18px}
+  .tbl{display:none}
+  .cards{display:block}
+  .sites{grid-template-columns:1fr 1fr;gap:8px}
+  .site{padding:15px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1 id="title">🏢 분양 고객관리</h1>
+
+<div id="login" class="setup" style="display:none;max-width:400px;margin:60px auto">
+  <h3 style="color:#8F3745;margin-bottom:10px">🔒 로그인</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:10px">비밀번호를 입력하세요</p>
+  <input id="pw" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')tryLogin()">
+  <button onclick="tryLogin()" style="width:100%;padding:12px;margin-top:8px">로그인</button>
+</div>
+
+<div id="setup" class="setup" style="display:none">
+  <h3 style="color:#8F3745;margin-bottom:10px">⚙️ 최초 1회 설정</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:10px">Supabase URL과 anon key를 입력하세요. 이 기기에만 저장됩니다.</p>
+  <input id="url" placeholder="https://xxxxx.supabase.co">
+  <input id="key" placeholder="anon public key">
+  <button onclick="saveConfig()" style="width:100%;padding:12px;margin-top:8px">저장하고 시작</button>
+</div>
+
+<div id="app" style="display:none">
+  <!-- 현장 선택 화면 -->
+  <div id="siteView">
+    <div class="bar">
+      <input type="text" id="globalQ" placeholder="🔍 전체 검색 (이름/연락처/메모)" oninput="globalSearch()" style="flex:1;min-width:200px">
+    </div>
+    <div id="searchResults" style="display:none;background:#fff;border-radius:8px;padding:10px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.06)"></div>
+    <div class="bar">
+      <input type="text" id="newSite" placeholder="새 현장 이름 (예: 서동탄역 랜시티)" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')addSite()">
+      <button onclick="addSite()">➕ 현장 추가</button>
+      <button class="g" onclick="resetConfig()">설정 변경</button>
+    </div>
+    <div id="siteList" class="sites"></div>
+  </div>
+
+  <!-- 고객 목록 화면 -->
+  <div id="custView" style="display:none">
+    <div class="bar">
+      <button class="back" onclick="goSites()">← 현장 목록</button>
+      <button onclick="addCustomer()">➕ 고객 추가</button>
+      <input type="text" id="q" placeholder="이름/연락처/메모 검색..." oninput="render()">
+    </div>
+    <table class="tbl">
+      <thead><tr>
+        <th style="width:10%">이름</th><th style="width:13%">연락처</th>
+        <th style="width:25%">메모</th><th style="width:10%">유입</th>
+        <th style="width:10%">결과</th><th style="width:10%">감도</th>
+        <th style="width:22%">작업</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div id="cards" class="cards"></div>
+  </div>
+</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let sb=null,sites=[],customers=[],currentSite=null,clipboard=null;
+
+const INFLOW=['','네이버','메타','지인','현수막','전화','방문','기타'];
+const RESULT=['','상담중','계약','보류','거절','재방문','부재'];
+const SENSITIVITY=['','★★★','★★','★','-'];
+
+const APP_PW='0230';
+
+// ===== 로그인 =====
+window.onload=()=>{
+  document.getElementById('app').style.display='block';
+  if(sessionStorage.getItem('authed')==='1'){
+    afterLogin();
+  }else{
+    document.getElementById('login').style.display='block';
+    setTimeout(()=>document.getElementById('pw').focus(),100);
+  }
+};
+
+function tryLogin(){
+  const v=document.getElementById('pw').value;
+  if(v===APP_PW){
+    sessionStorage.setItem('authed','1');
+    document.getElementById('login').style.display='none';
+    afterLogin();
+  }else{
+    alert('비밀번호가 틀렸습니다');
+    document.getElementById('pw').value='';
+  }
+}
+
+function afterLogin(){
+  const u=localStorage.getItem('sb_url'),k=localStorage.getItem('sb_key');
+  if(u&&k){initSupabase(u,k);loadSites()}
+  else document.getElementById('setup').style.display='block';
+}
+
+// ===== 전체 검색 =====
+async function globalSearch(){
+  const q=document.getElementById('globalQ').value.trim();
+  const box=document.getElementById('searchResults');
+  if(!q){box.style.display='none';box.innerHTML='';return}
+  const {data,error}=await sb.from('customers')
+    .select('*,sites(id,name)')
+    .or(`name.ilike.%${q}%,phone.ilike.%${q}%,memo.ilike.%${q}%`)
+    .limit(50);
+  if(error){box.innerHTML='<div style="color:#c0392b">검색 오류</div>';box.style.display='block';return}
+  box.style.display='block';
+  if(!data||data.length===0){box.innerHTML='<div style="color:#999;padding:10px">검색 결과 없음</div>';return}
+  box.innerHTML='<div style="font-size:13px;color:#666;margin-bottom:8px">검색 결과 '+data.length+'건</div>'+
+    data.map(c=>`<div onclick="openSite(${c.sites.id},'${escAttr(c.sites.name)}')" style="padding:10px;border-bottom:1px solid #eee;cursor:pointer" onmouseover="this.style.background='#faf8f0'" onmouseout="this.style.background='#fff'">
+      <div style="font-weight:bold;color:#8F3745">${esc(c.name)||'(이름없음)'} <span style="font-weight:normal;color:#00424E;font-size:12px">[${esc(c.sites.name)}]</span></div>
+      <div style="font-size:13px;color:#555">📞 ${esc(c.phone)||'-'}</div>
+      <div style="font-size:12px;color:#777;margin-top:3px">${esc((c.memo||'').slice(0,80))}</div>
+    </div>`).join('');
+}
+
+function oldInit_unused(){}
+
+function saveConfig(){
+  const u=document.getElementById('url').value.trim();
+  const k=document.getElementById('key').value.trim();
+  if(!u||!k)return alert('둘 다 입력해주세요');
+  localStorage.setItem('sb_url',u);localStorage.setItem('sb_key',k);
+  initSupabase(u,k);
+  document.getElementById('setup').style.display='none';
+  loadSites();
+}
+function resetConfig(){
+  if(!confirm('설정을 초기화하시겠습니까?'))return;
+  localStorage.clear();location.reload();
+}
+function initSupabase(u,k){sb=supabase.createClient(u,k)}
+
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',1800);
+}
+
+// ===== 현장 =====
+async function loadSites(){
+  const {data,error}=await sb.from('sites').select('*,customers(count)').order('created_at',{ascending:false});
+  if(error)return alert('로드 실패: '+error.message);
+  sites=data||[];renderSites();
+}
+async function addSite(){
+  const name=document.getElementById('newSite').value.trim();
+  if(!name)return;
+  const {error}=await sb.from('sites').insert({name});
+  if(error)return alert(error.message);
+  document.getElementById('newSite').value='';loadSites();
+}
+async function delSite(id,e){
+  e.stopPropagation();
+  if(!confirm('현장과 모든 고객을 삭제합니다. 계속?'))return;
+  await sb.from('sites').delete().eq('id',id);loadSites();
+}
+function renderSites(){
+  const el=document.getElementById('siteList');
+  if(sites.length===0){el.innerHTML='<div class="empty">현장을 추가해주세요</div>';return}
+  el.innerHTML=sites.map(s=>`
+    <div class="site" onclick="openSite(${s.id},'${escAttr(s.name)}')">
+      <button class="x" onclick="delSite(${s.id},event)">✕</button>
+      <h3>${esc(s.name)}</h3>
+      <div class="cnt">고객 ${s.customers[0]?.count||0}명</div>
+    </div>`).join('');
+}
+
+// ===== 고객 =====
+async function openSite(id,name){
+  currentSite={id,name};
+  document.getElementById('siteView').style.display='none';
+  document.getElementById('custView').style.display='block';
+  document.getElementById('title').innerHTML=`🏢 ${esc(name)}`;
+  await loadCustomers();
+}
+function goSites(){
+  currentSite=null;
+  document.getElementById('siteView').style.display='block';
+  document.getElementById('custView').style.display='none';
+  document.getElementById('title').textContent='🏢 분양 고객관리';
+  document.getElementById('globalQ').value='';
+  document.getElementById('searchResults').style.display='none';
+  loadSites();
+}
+async function loadCustomers(){
+  const {data,error}=await sb.from('customers').select('*').eq('site_id',currentSite.id).order('created_at',{ascending:false});
+  if(error)return alert(error.message);
+  customers=data||[];render();
+}
+async function addCustomer(){
+  const {data,error}=await sb.from('customers').insert({site_id:currentSite.id,name:'',phone:'',memo:'',inflow:'',result:'',sensitivity:''}).select();
+  if(error)return alert(error.message);
+  customers.unshift(data[0]);render();
+}
+async function upd(id,field,val){
+  const c=customers.find(x=>x.id===id);if(c)c[field]=val;
+  const {error}=await sb.from('customers').update({[field]:val}).eq('id',id);
+  if(error)toast('❌ 저장 실패: '+error.message);
+  else toast('✅ 저장됨');
+}
+async function del(id){
+  if(!confirm('삭제?'))return;
+  await sb.from('customers').delete().eq('id',id);
+  customers=customers.filter(x=>x.id!==id);render();
+}
+
+// ===== 시스템 클립보드로 복사 =====
+async function copyRow(id){
+  const c=customers.find(x=>x.id===id);
+  const text=`${c.name||''} ${c.phone||''}`.trim();
+  if(!text)return toast('❌ 복사할 내용 없음');
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('📋 복사됨: '+text);
+  }catch(err){
+    // HTTPS 아니거나 권한 없을 때 폴백
+    const ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');toast('📋 복사됨: '+text)}
+    catch(e){toast('❌ 복사 실패')}
+    document.body.removeChild(ta);
+  }
+}
+
+// ===== 렌더링 =====
+function render(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const list=q?customers.filter(c=>((c.name||'')+(c.phone||'')+(c.memo||'')).toLowerCase().includes(q)):customers;
+  
+  // 드롭다운 옵션 생성
+  const opts=(arr,v)=>arr.map(o=>`<option value="${esc(o)}" ${o===v?'selected':''}>${o||'-'}</option>`).join('');
+  
+  // 데스크톱
+  const tb=document.getElementById('tb');
+  if(list.length===0){tb.innerHTML='<tr><td colspan="7" class="empty">고객을 추가해주세요</td></tr>'}
+  else{
+    tb.innerHTML=list.map(c=>`<tr>
+      <td><input value="${escAttr(c.name)}" onchange="upd(${c.id},'name',this.value)"></td>
+      <td><input value="${escAttr(c.phone)}" onchange="upd(${c.id},'phone',this.value)"></td>
+      <td><textarea onchange="upd(${c.id},'memo',this.value)">${esc(c.memo)}</textarea></td>
+      <td><input value="${escAttr(c.inflow)}" onchange="upd(${c.id},'inflow',this.value)"></td>
+      <td><input value="${escAttr(c.result)}" onchange="upd(${c.id},'result',this.value)"></td>
+      <td><input value="${escAttr(c.sensitivity)}" onchange="upd(${c.id},'sensitivity',this.value)"></td>
+      <td><div class="act">
+        <button class="copy" onclick="copyRow(${c.id})">📋 복사</button>
+        <button class="d" onclick="del(${c.id})">삭제</button>
+      </div></td>
+    </tr>`).join('');
+  }
+  
+  // 모바일 카드
+  const cards=document.getElementById('cards');
+  if(list.length===0){cards.innerHTML='<div class="empty">고객을 추가해주세요</div>'}
+  else{
+    cards.innerHTML=list.map(c=>`<div class="card">
+      <div class="row">
+        <div class="f"><label>이름</label><input value="${escAttr(c.name)}" onchange="upd(${c.id},'name',this.value)"></div>
+        <div class="f"><label>연락처</label><input value="${escAttr(c.phone)}" onchange="upd(${c.id},'phone',this.value)"></div>
+      </div>
+      <div><label>메모</label><textarea onchange="upd(${c.id},'memo',this.value)">${esc(c.memo)}</textarea></div>
+      <div class="row" style="margin-top:8px">
+        <div class="f"><label>유입</label><input value="${escAttr(c.inflow)}" onchange="upd(${c.id},'inflow',this.value)"></div>
+        <div class="f"><label>결과</label><input value="${escAttr(c.result)}" onchange="upd(${c.id},'result',this.value)"></div>
+        <div class="f"><label>감도</label><input value="${escAttr(c.sensitivity)}" onchange="upd(${c.id},'sensitivity',this.value)"></div>
+      </div>
+      <div class="btns">
+        <button class="copy" onclick="copyRow(${c.id})">📋 복사</button>
+        <button class="d" onclick="del(${c.id})">삭제</button>
+      </div>
+    </div>`).join('');
+  }
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function escAttr(s){return esc(s)}
+</script>
+</body>
+</html>
